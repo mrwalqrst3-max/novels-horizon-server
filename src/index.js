@@ -107,7 +107,7 @@ app.get('/api/announcements', async (_req, res) => {
     const cached = await redis.cacheGet('announcements');
     if (cached) return res.json(cached);
     const rows = await supabaseFetch(
-      'announcements?is_active=true&order=created_at.desc&limit=10'
+      'announcements?is_active=is.true&order=created_at.desc&limit=10'
     );
     await redis.cacheSet('announcements', rows, 30);
     res.json(rows);
@@ -122,7 +122,7 @@ app.get('/api/featured', async (_req, res) => {
     if (cached) return res.json(cached);
     const rows = await supabaseFetch(
       'novels?select=id,title,cover_url,category,rating_avg,views_count'
-        + '&is_published=true&is_featured=true&order=rating_avg.desc&limit=10'
+        + '&is_published=is.true&is_featured=is.true&order=rating_avg.desc&limit=10'
     );
     await redis.cacheSet('featured', rows, 60);
     res.json(rows);
