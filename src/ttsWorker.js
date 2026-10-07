@@ -14,7 +14,7 @@ const { spawn } = require('child_process');
 const fs = require('fs/promises');
 const os = require('os');
 const path = require('path');
-const { queuePop } = require('../redis');
+const { queuePop } = require('./redis');
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
