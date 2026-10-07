@@ -66,7 +66,16 @@ async function seedDeveloper(client) {
   if (existing.rows.length > 0) {
     userId = existing.rows[0].id;
     await client.query(
-      'UPDATE auth.users SET encrypted_password = $1, email_confirmed_at = now(), raw_user_meta_data = $2, updated_at = now() WHERE id = $3',
+      `UPDATE auth.users SET encrypted_password = $1, email_confirmed_at = now(), raw_user_meta_data = $2, updated_at = now(),
+              confirmation_token = COALESCE(confirmation_token, ''),
+              recovery_token = COALESCE(recovery_token, ''),
+              email_change = COALESCE(email_change, ''),
+              email_change_token_new = COALESCE(email_change_token_new, ''),
+              email_change_token_current = COALESCE(email_change_token_current, ''),
+              reauthentication_token = COALESCE(reauthentication_token, ''),
+              phone_change = COALESCE(phone_change, ''),
+              phone_change_token = COALESCE(phone_change_token, '')
+       WHERE id = $3`,
       [hash, meta, userId]
     );
     console.log(`Updated existing auth user ${userId}`);
@@ -74,10 +83,13 @@ async function seedDeveloper(client) {
     const inserted = await client.query(
       `INSERT INTO auth.users
          (instance_id, id, aud, role, email, encrypted_password, email_confirmed_at,
-          raw_app_meta_data, raw_user_meta_data, created_at, updated_at)
+          raw_app_meta_data, raw_user_meta_data, created_at, updated_at,
+          confirmation_token, recovery_token, email_change, email_change_token_new,
+          email_change_token_current, reauthentication_token, phone, phone_change, phone_change_token)
        VALUES ('00000000-0000-0000-0000-000000000000', gen_random_uuid(), 'authenticated', 'authenticated',
                $1, $2, now(),
-               '{"provider":"email","providers":["email"]}', $3::jsonb, now(), now())
+               '{"provider":"email","providers":["email"]}', $3::jsonb, now(), now(),
+               '', '', '', '', '', '', '', '', '')
        RETURNING id`,
       [email, hash, meta]
     );
@@ -87,11 +99,17 @@ async function seedDeveloper(client) {
 
   await client.query(
     `INSERT INTO auth.identities (id, user_id, provider_id, identity_data, provider, last_sign_in_at, created_at, updated_at)
-     VALUES (gen_random_uuid(), $1, lower($2),
+     VALUES (gen_random_uuid(), $1, $3::text,
              jsonb_build_object('sub', $3::text, 'email', $2, 'email_verified', true, 'phone_verified', false),
              'email', now(), now(), now())
      ON CONFLICT DO NOTHING`,
     [userId, email, String(userId)]
+  );
+  // GoTrue expects provider_id = user id for the email provider; repair legacy rows.
+  await client.query(
+    `UPDATE auth.identities SET provider_id = user_id::text
+     WHERE user_id = $1 AND provider = 'email' AND provider_id <> user_id::text`,
+    [userId]
   );
 
   // handle_new_user trigger normally creates this row; force DEVELOPER privileges.
